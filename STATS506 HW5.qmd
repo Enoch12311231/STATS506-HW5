@@ -9,6 +9,8 @@ execute:
 ---
 
 ```{r}
+#1
+#checked the definition and some detailed formulas of the Wald-style normal approximation confidence intervals.
 #1a
 #1a1
 setClass(
@@ -405,6 +407,7 @@ Among players who played at least five matches in 2019, Rafael Nadal had the hig
 
 ```{r}
 #3
+#asked chatgpt about the parameters in making a good graph, looked at the solution Professor gave in the course website.
 #3a
 library(plotly)
 library(data.table)
@@ -632,3 +635,5 @@ p3
 ```
 
 I define substantial COVID-19 activity as having a seven-day average of at least five daily new cases per 100,000 people for seven consecutive days. As shown in the plot, New York was the first state to meet this situation on March 21, 2020, followed by New Jersey on March 24, Louisiana on March 26, and Massachusetts on March 27. Connecticut and Michigan both met on March 28, tying for fifth place. Therefore, six states are identified because of the tie.
+
+**GitHub Repository:** [STATS506-HW5](https://github.com/Enoch12311231/STATS506-HW5)
