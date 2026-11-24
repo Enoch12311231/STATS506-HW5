@@ -1,0 +1,634 @@
+---
+title: "STATS 506 — Homework 5"
+format:
+  html:
+    embed-resources: true
+    code-fold: true
+execute:
+  echo: true
+---
+
+```{r}
+#1a
+#1a1
+setClass(
+  "waldCI",
+  slots = c(
+    mean = "numeric",
+    sterr = "numeric",
+    level = "numeric"
+  )
+)
+
+#' Construct a Wald confidence interval
+#' Creates a confidence interval from either a mean and standard error or
+#' a lower and upper bound.
+#' @param level A confidence level strictly between 0 and 1.
+#' @param mean A numeric mean.
+#' @param sterr A non-negative numeric standard error.
+#' @param lb A finite numeric lower bound.
+#' @param ub A finite numeric upper bound.
+#' @return An object of class waldCI.
+makeWaldCI <- function(level, mean = NULL, sterr = NULL,
+                       lb = NULL, ub = NULL) {
+  if (length(level) != 1 || !is.numeric(level) ||
+      !is.finite(level) || level <= 0 || level >= 1) {
+    stop("Confidence level must be between 0 and 1.")
+  }
+  z <- qnorm((1 + level) / 2)
+  if (!is.null(mean) && !is.null(sterr) &&
+      is.null(lb) && is.null(ub)) {
+    new("waldCI", mean = mean, 
+        sterr = sterr, level = level)
+    
+    
+  } else if (!is.null(lb) && !is.null(ub) &&
+             is.null(mean) && is.null(sterr)) {
+    mean <- (lb + ub) / 2
+    sterr <- (ub - lb) / (2 * z)
+    new("waldCI", mean = mean,
+        sterr = sterr, level = level)
+  } else {
+    stop("Provide either mean and sterr, or lb and ub.")
+  }
+}
+
+
+#1a2
+#' Validate a Wald confidence interval
+#' Checks the slots and calculated bounds of a waldCI object.
+#' @param object An object of class waldCI.
+#' @return TRUE if the object is valid, or a character string describing the validation error.
+setValidity("waldCI", function(object) {
+  if (length(object@mean) != 1 ||
+      !is.finite(object@mean)) {
+    return("Mean must be a single finite number.")
+  }
+  if (length(object@sterr) != 1 ||
+      !is.finite(object@sterr) ||
+      object@sterr < 0) {
+    return("Standard error must be finite and non-negative.")
+  }
+  if (length(object@level) != 1 ||
+      !is.finite(object@level) ||
+      object@level <= 0 || object@level >= 1) {
+    return("Confidence level must be between 0 and 1.")
+  }
+  z <- qnorm((1 + object@level) / 2)
+  lower <- object@mean - z * object@sterr
+  upper <- object@mean + z * object@sterr
+  if (!is.finite(lower) || !is.finite(upper)) {
+    return("Confidence interval bounds must be finite.")
+  }
+  if (lower > upper) {
+    return("Lower bound cannot exceed upper bound.")
+  }
+  return(TRUE)
+})
+
+
+#1a3
+#' Display a Wald confidence interval
+#' Prints the confidence level, bounds, mean, and standard error.
+#' @param object An object of class waldCI.
+#' @return The interval information is printed.
+setMethod("show", "waldCI", function(object) {
+  z <- qnorm((1 + object@level) / 2)
+  lower <- object@mean - z * object@sterr
+  upper <- object@mean + z * object@sterr
+  cat(object@level * 100, "% Confidence Interval\n", sep = "")
+  cat("Lower bound:", lower, "\n")
+  cat("Upper bound:", upper, "\n")
+  cat("Mean:", object@mean, "\n")
+  cat("Standard error:", object@sterr, "\n")
+})
+
+
+#1a4
+#' Get the lower bound
+#' @param object A waldCI object.
+#' @return The numeric lower bound.
+setGeneric("lb", function(object) standardGeneric("lb"))
+setMethod("lb", "waldCI", function(object) {
+  z <- qnorm((1 + object@level) / 2)
+  return(object@mean - z * object@sterr)
+})
+
+
+#' Get the upper bound
+#' @param object A waldCI object.
+#' @return The numeric upper bound.
+setGeneric("ub", function(object) standardGeneric("ub"))
+setMethod("ub", "waldCI", function(object) {
+  z <- qnorm((1 + object@level) / 2)
+  return(object@mean + z * object@sterr)
+})
+
+
+#' Get the mean of a Wald confidence interval
+#' @param x A waldCI object.
+#' @param ... Additional arguments, not used.
+#' @return The numeric mean.
+setMethod("mean", "waldCI", function(x, ...) {
+  return(x@mean)
+})
+
+
+#' Get the standard error
+#' @param object A waldCI object.
+#' @return The numeric standard error.
+setGeneric("sterr", function(object) standardGeneric("sterr"))
+setMethod("sterr", "waldCI", function(object) {
+  return(object@sterr)
+})
+
+
+#' Get the confidence level
+#' @param object A waldCI object.
+#' @return The numeric confidence level.
+setGeneric("level", function(object) standardGeneric("level"))
+setMethod("level", "waldCI", function(object) {
+  return(object@level)
+})
+
+
+#1a5
+#' Validate a setter input
+#' @param value A numeric value to validate.
+#' @return NULL invisibly if the input is valid; otherwise an error.
+checkSetterValue <- function(value) {
+  if (!is.numeric(value) || length(value) != 1 ||
+      !is.finite(value) || is.complex(value)) {
+    stop("Value must be a single finite numeric value.")
+  }
+  invisible(NULL)
+}
+
+
+#' Set the lower bound
+#' @param object A waldCI object.
+#' @param value The new lower bound.
+#' @return The modified waldCI object.
+setGeneric("lb<-", function(object, value) standardGeneric("lb<-"))
+setReplaceMethod("lb", "waldCI", function(object, value) {
+  checkSetterValue(value)
+  if (value > ub(object)) {
+    stop("Lower bound cannot exceed upper bound.")
+  }
+  object <- makeWaldCI(level = level(object), lb = value, ub = ub(object))
+  validObject(object)
+  return(object)
+})
+
+
+#' Set the upper bound
+#' @param object A waldCI object.
+#' @param value The new upper bound.
+#' @return The modified waldCI object.
+setGeneric("ub<-", function(object, value) standardGeneric("ub<-"))
+setReplaceMethod("ub", "waldCI", function(object, value) {
+  checkSetterValue(value)
+  if (value < lb(object)) {
+    stop("Upper bound cannot be less than lower bound.")
+  }
+  object <- makeWaldCI(level = level(object), lb = lb(object), ub = value)
+  validObject(object)
+  return(object)
+})
+
+
+#' Set the mean
+#' @param x A waldCI object.
+#' @param value The new mean.
+#' @return The modified waldCI object.
+setGeneric("mean<-", function(x, value) standardGeneric("mean<-"))
+setReplaceMethod("mean", "waldCI", function(x, value) {
+  checkSetterValue(value)
+  x@mean <- value
+  validObject(x)
+  return(x)
+})
+
+
+#' Set the standard error
+#' @param object A waldCI object.
+#' @param value The new standard error.
+#' @return The modified waldCI object.
+setGeneric("sterr<-", function(object, value) standardGeneric("sterr<-"))
+setReplaceMethod("sterr", "waldCI", function(object, value) {
+  checkSetterValue(value)
+  object@sterr <- value
+  validObject(object)
+  return(object)
+})
+
+
+#' Set the confidence level
+#' @param object A waldCI object.
+#' @param value The new confidence level.
+#' @return The modified waldCI object.
+setGeneric("level<-", function(object, value) standardGeneric("level<-"))
+setReplaceMethod("level", "waldCI", function(object, value) {
+  checkSetterValue(value)
+  object@level <- value
+  validObject(object)
+  return(object)
+})
+
+
+#1a6
+#' Check whether a value is within a confidence interval
+#' @param object A waldCI object.
+#' @param value A single numeric value to check.
+#' @return A logical value indicating whether the value is within the interval.
+setGeneric("contains", function(object, value) standardGeneric("contains"))
+setMethod("contains", "waldCI", function(object, value) {
+  if (!is.numeric(value) || is.complex(value) ||
+      length(value) != 1 || is.na(value)) {
+    stop("Value must be a single non-missing numeric value.")
+  }
+  return(value >= lb(object) && value <= ub(object))
+})
+
+
+#1a7
+#' Check whether two confidence intervals overlap
+#' @param object A waldCI object.
+#' @param other Another waldCI object.
+#' @return A logical value indicating whether the intervals overlap.
+setGeneric("overlap", function(object, other) standardGeneric("overlap"))
+setMethod("overlap", signature(object = "waldCI", other = "waldCI"),
+          function(object, other) {
+            return(lb(object) <= ub(other) && lb(other) <= ub(object))
+          })
+
+
+#1a8
+#' Convert a Wald confidence interval to a numeric vector
+#' @param x A waldCI object.
+#' @param ... Additional arguments, not used.
+#' @return A numeric vector containing the lower and upper bounds.
+setMethod("as.numeric", "waldCI", function(x, ...) {
+  return(c(lb(x), ub(x)))
+})
+
+
+#1a9
+#' Transform a Wald confidence interval
+#' @param object A waldCI object.
+#' @param fun A monotonic function used to transform the interval.
+#' @return A transformed waldCI object with the original confidence level.
+setGeneric("transformCI", function(object, fun) standardGeneric("transformCI"))
+setMethod("transformCI", signature(object = "waldCI", fun = "function"),
+          function(object, fun) {
+            warning("Only monotonic functions make sense for confidence interval transformations.")
+            points <- seq(lb(object), ub(object), length.out = 101)
+            transformed <- vapply(points, fun, numeric(1))
+            if (any(!is.finite(transformed))) {
+              stop("Transformed values must be finite.")
+            }
+            changes <- diff(transformed)
+            if (!all(changes >= 0) && !all(changes <= 0)) {
+              stop("The function appears to be non-monotonic on the interval.")
+            }
+            bounds <- sort(transformed[c(1, length(transformed))])
+            return(makeWaldCI(level = level(object), lb = bounds[1], ub = bounds[2]))
+          })
+
+
+#1b
+ci1 <- makeWaldCI(level = 0.95, lb = 17.2, ub = 24.7)
+ci2 <- makeWaldCI(level = 0.99, mean = 13, sterr = 2.5)
+ci3 <- makeWaldCI(level = 0.75, lb = 27.43, ub = 39.22)
+
+
+ci1
+ci2
+ci3
+as.numeric(ci1)
+as.numeric(ci2)
+as.numeric(ci3)
+lb(ci2)
+ub(ci2)
+mean(ci1)
+sterr(ci3)
+level(ci2)
+lb(ci2) <- 10.5
+mean(ci3) <- 34
+level(ci3) <- .8
+contains(ci1, 17)
+contains(ci3, 44)
+overlap(ci1, ci2)
+eci1 <- transformCI(ci1, sqrt)
+eci1
+mean(transformCI(ci2, log))
+
+
+#1c
+#negative standard error
+try(makeWaldCI(level = 0.95, mean = 10, sterr = -2))
+
+
+#lb>ub
+try(makeWaldCI(level = 0.95, lb = 20, ub = 10))
+
+
+#infinite bounds
+try(makeWaldCI(level = 0.95, lb = 10, ub = Inf))
+try(makeWaldCI(level = 0.95, lb = -Inf, ub = 20))
+
+
+#invalid use of the setters
+try(lb(ci2) <- 100)
+try(ub(ci2) <- -100)
+try(mean(ci2) <- Inf)
+try(sterr(ci2) <- -2)
+try(level(ci2) <- 1.5)
+validObject(ci2)
+```
+
+```{r}
+#2
+#2a
+library(data.table)
+tennis <- fread("https://raw.githubusercontent.com/azhou5849/tennis-atp-sackmann-data/master/atp_matches_2019.csv")
+tennis[, uniqueN(tourney_name)]
+unique(tennis[grepl("^Davis Cup", tourney_name), tourney_name])[1:5]
+tennis[, uniqueN(sub("^Davis Cup.*", "Davis Cup", tourney_name))]
+```
+
+From the result above, there were 69 unique tournaments in 2019.
+
+```{r}
+#2b
+champions <- tennis[round == "F",
+                    .(wins = uniqueN(tourney_id)),
+                    by = winner_name]
+multiwinners <- champions[wins > 1][order(-wins, winner_name)]
+multiwinners
+nrow(multiwinners)
+multiwinners[wins == max(wins)]
+```
+
+Yes, there are 12 players who won more than one tournament, and 5 tournaments are the one that most winning players won.
+
+```{r}
+#2c
+ace_data <- tennis[!is.na(w_ace) & !is.na(l_ace)]
+ace_data[, .(
+  matches = .N,
+  mean_winner = mean(w_ace),
+  mean_loser = mean(l_ace),
+  mean_difference = mean(w_ace - l_ace),
+  percent_winner_more = mean(w_ace > l_ace) * 100,
+  percent_equal = mean(w_ace == l_ace) * 100,
+  percent_loser_more = mean(w_ace < l_ace) * 100
+)]
+```
+
+Yes, there is evidence that winners tend to serve more aces than losers. From the chart, winners have a higher average number of aces per match (1.7049) and serve more aces than losers in the majority of matches.
+
+```{r}
+#2d
+wins <- tennis[, .(wins = .N), by = .(player = winner_name)]
+losses <- tennis[, .(losses = .N), by = .(player = loser_name)]
+players <- merge(wins, losses, by = "player", all = TRUE)
+players[is.na(wins), wins := 0]
+players[is.na(losses), losses := 0]
+players[, matches := wins + losses]
+players[, win_rate := wins / matches]
+eligible <- players[matches >= 5]
+print(eligible[win_rate == max(win_rate)])
+```
+
+Among players who played at least five matches in 2019, Rafael Nadal had the highest win rate of approximately 86.96%, winning 60 out of 69 matches.
+
+```{r}
+#3
+#3a
+library(plotly)
+library(data.table)
+library(slider)
+url <- "https://raw.githubusercontent.com/nytimes/covid-19-data/refs/heads/master/rolling-averages/us-states.csv"
+covid <- fread(url)
+covid[, date := as.Date(date)]
+invisible(Sys.setlocale("LC_TIME", "C"))
+
+
+national <- covid[, .(daily_avg = sum(cases_avg, na.rm = TRUE)), by = date]
+setorder(national, date)
+national[, local_max := slide_dbl(daily_avg, max, .before = 60, .after = 60)]
+peaks <- national[daily_avg == local_max & daily_avg >= 25000]
+peaks[, run := cumsum(c(TRUE, as.integer(diff(date)) > 1))]
+peaks <- peaks[!duplicated(run)]
+peaks[, type := ifelse(daily_avg >= 100000, "Major", "Minor")]
+print(peaks[, .(date, daily_avg, type)])
+print(peaks[, .(count = .N), by = type])
+source_note <- list(
+  text = "Source: The New York Times COVID-19 Data",
+  xref = "paper", yref = "paper",
+  x = 0, y = -0.22,
+  xanchor = "left", showarrow = FALSE,
+  font = list(size = 11, color = "#64748B")
+)
+chart_font <- list(family = "Arial", size = 12, color = "#263238")
+p1 <- plot_ly(
+  national,
+  x = ~date, y = ~daily_avg,
+  type = "scatter", mode = "lines",
+  line = list(color = "#475569", width = 2),
+  showlegend = FALSE,
+  hovertemplate = "%{x|%b %d, %Y}<br>Cases: %{y:,.0f}<extra></extra>"
+) %>%
+  add_trace(
+    data = peaks[type == "Major"],
+    x = ~date, y = ~daily_avg,
+    type = "scatter", mode = "markers+text",
+    name = "Major spike",
+    marker = list(color = "#D55E00", size = 10, symbol = "diamond"),
+    text = ~format(date, "%b %Y"),
+    textposition = "top center",
+    inherit = FALSE
+  ) %>%
+  add_trace(
+    data = peaks[type == "Minor"],
+    x = ~date, y = ~daily_avg,
+    type = "scatter", mode = "markers+text",
+    name = "Minor spike",
+    marker = list(color = "#0072B2", size = 8),
+    text = ~format(date, "%b %Y"),
+    textposition = "top center",
+    inherit = FALSE
+  ) %>%
+  layout(
+    title = list(text = paste0(
+      "<b>Major and Minor COVID-19 Waves in the United States</b>",
+      "<br><sup>Major: ≥100,000 cases/day; Minor: 25,000 to below 100,000</sup>"
+    )),
+    xaxis = list(
+      title = "Date",
+      tickformat = "%b %Y",
+      dtick = "M6",
+      tick0 = "2020-01-01",
+      range = c("2020-01-01", as.character(max(national$date)))
+    ),
+    yaxis = list(
+      title = "Daily New Cases (7-Day Average)",
+      tickformat = ",d",
+      range = c(0, max(national$daily_avg) * 1.15)
+    ),
+    legend = list(orientation = "h", x = 0, y = 1.05),
+    font = chart_font,
+    plot_bgcolor = "white",
+    paper_bgcolor = "white",
+    annotations = list(source_note),
+    margin = list(l = 100, r = 40, t = 110, b = 100)
+  ) %>%
+  config(displaylogo = FALSE)
+p1
+```
+
+There were approximately four major spikes and four minor spikes in COVID-19 cases. Peaks are identified using a 60-day window on either side of each observation. Major spikes have at least 100,000 daily cases, while minor spikes have between 25,000 and 100,000 daily cases, excluding the upper endpoint.
+
+```{r}
+#3b
+state_rates <- covid[state %in% state.name, .(
+  overall_rate = sum(cases_avg_per_100k, na.rm = TRUE)
+), by = state]
+setorder(state_rates, -overall_rate, state)
+highest <- state_rates$state[1]
+lowest <- tail(state_rates$state, 1)
+print(state_rates[state %in% c(highest, lowest)])
+trajectory <- covid[state %in% c(highest, lowest)]
+setorder(trajectory, state, date)
+p2 <- plot_ly() %>%
+  add_lines(
+    data = trajectory[state == highest],
+    x = ~date, y = ~cases_avg_per_100k,
+    name = paste0(highest, " (Highest)"),
+    line = list(color = "#D55E00", width = 2.5),
+    hovertemplate = "%{x|%b %d, %Y}<br>Cases per 100,000: %{y:.2f}"
+  ) %>%
+  add_lines(
+    data = trajectory[state == lowest],
+    x = ~date, y = ~cases_avg_per_100k,
+    name = paste0(lowest, " (Lowest)"),
+    line = list(color = "#0072B2", width = 2.5, dash = "dash"),
+    hovertemplate = "%{x|%b %d, %Y}<br>Cases per 100,000: %{y:.2f}"
+  ) %>%
+  layout(
+    title = list(text = paste0(
+      "<b>COVID-19 Trajectories: ", highest, " vs. ", lowest, "</b>",
+      "<br><sup>Highest and lowest cumulative case rates among 50 states</sup>"
+    )),
+    xaxis = list(
+      title = "Date",
+      tickformat = "%b %Y",
+      dtick = "M6",
+      tick0 = "2020-01-01",
+      range = c("2020-01-01", as.character(max(trajectory$date)))
+    ),
+    yaxis = list(
+      title = "Daily New Cases per 100,000 (7-Day Average)",
+      rangemode = "tozero",
+      automargin = TRUE
+    ),
+    legend = list(orientation = "h", x = 0, y = 1.05),
+    hovermode = "x unified",
+    font = chart_font,
+    plot_bgcolor = "white",
+    paper_bgcolor = "white",
+    annotations = list(source_note),
+    margin = list(l = 100, r = 40, t = 110, b = 100)
+  ) %>%
+  config(displaylogo = FALSE)
+p2
+winter_peaks <- trajectory[
+  date >= as.Date("2021-12-01") & date <= as.Date("2022-02-28"),
+  .(peak_rate = max(cases_avg_per_100k, na.rm = TRUE)),
+  by = state
+]
+print(winter_peaks)
+```
+
+Rhode Island had the highest overall COVID-19 case rate among the 50 states, at approximately 43,296 cases per 100,000 people, while Maine had the lowest, at approximately 22,020. The largest difference occurred during the winter of 2021–2022, when Rhode Island reached a peak of 506.81 daily cases per 100,000 people, compared with 81.21 in Maine. However, their trajectories became more similar from July 2022.
+
+```{r}
+#3c
+onset_data <- covid[
+  state %in% state.name &
+    date >= as.Date("2020-01-01") &
+    date <= as.Date("2020-12-31")
+]
+setorder(onset_data, state, date)
+onset_data[, qualifying := as.integer(
+  !is.na(cases_avg_per_100k) & cases_avg_per_100k >= 5
+)]
+onset_data[, sustained := (
+  frollsum(qualifying, n = 7, align = "left") == 7 &
+    shift(as.integer(date), 6, type = "lead") - as.integer(date) == 6
+), by = state]
+onsets <- onset_data[sustained %in% TRUE, .(
+  onset = min(date)
+), by = state]
+setorder(onsets, onset, state)
+onsets[, rank := frank(onset, ties.method = "min")]
+first_five <- onsets[rank <= 5]
+print(first_five)
+early_states <- onsets[rank <= 10]
+p3 <- plot_ly() %>%
+  add_trace(
+    data = early_states[rank <= 5],
+    x = ~onset, y = ~state,
+    type = "scatter", mode = "markers+text",
+    name = "First five (including ties)",
+    marker = list(color = "#D55E00", size = 12, symbol = "diamond"),
+    text = ~format(onset, "%b %d"),
+    textposition = "middle right",
+    hovertemplate = "%{y}<br>Onset: %{x|%b %d, %Y}<extra></extra>"
+  ) %>%
+  add_trace(
+    data = early_states[rank > 5],
+    x = ~onset, y = ~state,
+    type = "scatter", mode = "markers+text",
+    name = "Other early states",
+    marker = list(color = "#94A3B8", size = 9),
+    text = ~format(onset, "%b %d"),
+    textposition = "middle right",
+    hovertemplate = "%{y}<br>Onset: %{x|%b %d, %Y}<extra></extra>"
+  ) %>%
+  layout(
+    title = list(text = paste0(
+      "<b>Earliest States with Sustained COVID-19 Activity</b>",
+      "<br><sup>At least 5 daily cases per 100,000 for 7 consecutive days</sup>"
+    )),
+    xaxis = list(
+      title = "Onset Date (2020)",
+      type = "date",
+      tickformat = "%b %d",
+      nticks = 7,
+      range = as.character(c(
+        min(early_states$onset) - 2,
+        max(early_states$onset) + 5
+      ))
+    ),
+    yaxis = list(
+      title = "",
+      type = "category",
+      categoryorder = "array",
+      categoryarray = rev(early_states$state),
+      automargin = TRUE
+    ),
+    legend = list(orientation = "h", x = 0, y = 1.05),
+    font = chart_font,
+    plot_bgcolor = "white",
+    paper_bgcolor = "white",
+    annotations = list(source_note),
+    height = 550,
+    margin = list(l = 140, r = 50, t = 110, b = 100)
+  ) %>%
+  config(displaylogo = FALSE)
+p3
+```
+
+I define substantial COVID-19 activity as having a seven-day average of at least five daily new cases per 100,000 people for seven consecutive days. As shown in the plot, New York was the first state to meet this situation on March 21, 2020, followed by New Jersey on March 24, Louisiana on March 26, and Massachusetts on March 27. Connecticut and Michigan both met on March 28, tying for fifth place. Therefore, six states are identified because of the tie.
